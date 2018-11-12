@@ -46,7 +46,7 @@ class SQLiSample(object):
             yield smpl
 
 
-class CHttpRunner(object):
+class CSampleFixture(object):
     def __init__(self):
         pass
 
@@ -54,10 +54,16 @@ class CHttpRunner(object):
         pass
 
     def run_sample(self, sample_obj):
-        pass
+        # requests.get()
 
     def header_test(self):
         pass
 
     def body_test(self):
         pass
+
+
+def run_test():
+    uri = "http://192.168.25.10"
+    method = "GET"
+    requests.Request()
