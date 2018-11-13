@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
     for test_url in runner.generate_url():
         try:
-            r = requests.get(test_url)
+            r = requests.get(test_url, headers={"User-Agent": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"})
             if r.status_code == 200:
                 print "\n%s\nstatus code: %d\n" % (test_url, r.status_code)
             else:
