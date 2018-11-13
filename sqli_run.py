@@ -114,8 +114,10 @@ if __name__ == "__main__":
     for test_url in runner.generate_url():
         try:
             r = requests.get(test_url)
-            if r.status_code != 200:
+            if r.status_code == 200:
                 print "\n%s\nstatus code: %d\n" % (test_url, r.status_code)
+            else:
+                print "\n%s\nstatus code: %d blocked.\n" % (test_url, r.status_code)
         except requests.exceptions.ConnectionError, e:
             print "\n%s\nerror: %s\n" % (test_url, e)
 
