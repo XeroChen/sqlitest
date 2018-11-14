@@ -8,8 +8,6 @@ import os
 import sys
 import getopt
 
-log = logging.getLogger("main_logger")
-
 
 def setup_logging(default_path='config.yaml', default_level=logging.INFO):
     path = default_path
@@ -99,13 +97,23 @@ class SQLiURLRunner(CRunner):
 
     def run(self):
         import requests
+        log20x = logging.getLogger("log20x")
+        log40x = logging.getLogger("log40x")
+        err_log = logging.getLogger("err_logger")
         for test_url in self._generate_url():
             try:
+                print "testing: %s" % test_url
                 r = requests.get(test_url, headers={
                     "User-Agent": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"})
-                print "[%d] %s\n" % (r.status_code, test_url)
+                if r.status_code / 200 == 1:
+                    log20x.info("[%d] %s" % (r.status_code, test_url))
+                elif r.status_code >= 500:
+                    err_log.error("[%d] %s" % (r.status_code, test_url))
+                else:
+                    log40x.info("[%d] %s" % (r.status_code, test_url))
+
             except requests.exceptions.ConnectionError, e:
-                print "[%s] %s\n" % (e, test_url)
+                err_log.error("[%s] %s" % (e, test_url))
 
     def set_sample(self, url_sample):
         self.sample = url_sample
@@ -169,7 +177,7 @@ def main():
 
 
 if __name__ == "__main__":
-    # setup_logging("./log_conf.yaml")
+    setup_logging("./log_conf.yaml")
     if len(sys.argv) < 2:
         usage()
         exit(1)

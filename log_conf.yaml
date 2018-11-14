@@ -15,6 +15,21 @@ handlers:
         formatter: simple
         level: DEBUG
         filename: debug.log
+    file_20x:
+        class : logging.handlers.RotatingFileHandler
+        formatter: simple
+        level: DEBUG
+        filename: 20x.log
+        maxBytes: 10485760
+        backupCount: 20
+    file_40x:
+        class : logging.handlers.RotatingFileHandler
+        formatter: simple
+        level: DEBUG
+        filename: 40x.log 
+        maxBytes: 10485760
+        backupCount: 20
+        encoding: utf8     
     error:
         class: logging.handlers.RotatingFileHandler
         level: ERROR
@@ -24,9 +39,15 @@ handlers:
         backupCount: 20
         encoding: utf8
 loggers:
-    main_logger:
+    log20x:
+        level: INFO
+        handlers: [file_20x]
+    log40x:
+        level: INFO
+        handlers: [file_40x]
+    err_logger:
         level: DEBUG
-        handlers: [console, file, error]
+        handlers: [error]
     dbg_logger:
-      level: DEBUG
-      handlers: [console]
+        level: DEBUG
+        handlers: [console]
