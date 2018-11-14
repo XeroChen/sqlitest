@@ -102,7 +102,7 @@ class SQLiURLRunner(CRunner):
         err_log = logging.getLogger("err_logger")
         for test_url in self._generate_url():
             try:
-                print "testing: %s" % test_url
+                # print "testing: %s" % test_url
                 r = requests.get(test_url, headers={
                     "User-Agent": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"})
                 if r.status_code / 200 == 1:
