@@ -1,11 +1,12 @@
 # -*- coding: UTF-8 -*-
 
-import requests
 import fnmatch
 import logging
 import yaml
 import logging.config
 import os
+import sys
+import getopt
 
 log = logging.getLogger("main_logger")
 
@@ -71,53 +72,108 @@ class CSample(object):
                 yield smpl_fn, smpl_ln[0], smpl_ln[1]
 
 
-class CSampleRunner(object):
+class CRunner(object):
     def __init__(self):
-        self.url_sample = None
-        self.url_payload = None
+        self.sample = None
+        self.payload = None
+        self.target = None
 
     def run(self):
         pass
 
-    def set_url_sample(self, url_sample):
-        self.url_sample = url_sample
+    def set_sample(self, sample):
+        self.sample = sample
 
-    def set_url_payload(self, url_payload):
-        self.url_payload = url_payload
+    def set_payload(self, payload):
+        self.payload = payload
 
-    def generate_url(self):
-        if not self.url_payload:
-            print
-        for templ in self.url_sample.sample_iter():
-            for pld in self.url_payload.sample_iter():
-                yield templ[2].replace("{{.payload}}", pld[2])
-
-    def header_test(self):
-        pass
-
-    def body_test(self):
-        pass
+    def set_target(self, target):
+        self.target = target
 
 
-if __name__ == "__main__":
-    setup_logging("./log_conf.yaml")
+class SQLiURLRunner(CRunner):
+    def __init__(self):
+        for base in self.__class__.__bases__:
+            if hasattr(base, '__init__'):
+                base.__init__(self)
+
+    def run(self):
+        import requests
+        for test_url in self._generate_url():
+            try:
+                r = requests.get(test_url, headers={
+                    "User-Agent": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"})
+                print "[%d] %s\n" % (r.status_code, test_url)
+            except requests.exceptions.ConnectionError, e:
+                print "[%s] %s\n" % (e, test_url)
+
+    def set_sample(self, url_sample):
+        self.sample = url_sample
+
+    def set_payload(self, url_payload):
+        self.payload = url_payload
+
+    def set_target(self, target):
+        self.target = target
+
+    def _generate_url(self):
+        if not self.payload:
+            print "No payloads found."
+            sys.exit(9)
+        for templ in self.sample.sample_iter():
+            for pld in self.payload.sample_iter():
+                yield templ[2].replace("{{.target}}", self.target).replace("{{.payload}}", pld[2])
+
+
+def usage():
+    print "Usage: %s -t <IP or DomainName>" % sys.argv[0]
+    print '''This will load SQL injection payloads from ./data directory (files named "sqli-*") \
+        and url templates from ./data/url-sample.tpl'''
+
+
+def main():
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "ht:", ["help", "target="])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print str(err)  # will print something like "option -a not recognized"
+        sys.exit(2)
+
+    target = ""
+
+    for opt, param in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            sys.exit(0)
+        elif opt in ("-t", "--target"):
+            target = param
+        else:
+            assert False, "unknown option %s" % opt
+
+    if not target:
+        print "No target specified. exit"
+        sys.exit(9)
+
     sqli_samples = CSample()
     sqli_samples.load_from_dir("./data", "sqli*")
 
     url_tpl = CSample()
     url_tpl.load_from_file("./data/url-sample.tpl")
 
-    runner = CSampleRunner()
-    runner.set_url_sample(url_tpl)
-    runner.set_url_payload(sqli_samples)
+    runner = SQLiURLRunner()
+    runner.set_sample(url_tpl)
+    runner.set_payload(sqli_samples)
+    runner.set_target(target)
+    runner.run()
 
-    for test_url in runner.generate_url():
-        try:
-            r = requests.get(test_url, headers={"User-Agent": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"})
-            if r.status_code == 200:
-                print "\n%s\nstatus code: %d\n" % (test_url, r.status_code)
-            else:
-                print "\n%s\nstatus code: %d blocked.\n" % (test_url, r.status_code)
-        except requests.exceptions.ConnectionError, e:
-            print "\n%s\nerror: %s\n" % (test_url, e)
+
+if __name__ == "__main__":
+    # setup_logging("./log_conf.yaml")
+    if len(sys.argv) < 2:
+        usage()
+        exit(1)
+    main()
+
+
 
