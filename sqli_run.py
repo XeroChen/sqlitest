@@ -7,6 +7,7 @@ import logging.config
 import os
 import sys
 import getopt
+import time
 
 
 def setup_logging(default_path='config.yaml', default_level=logging.INFO):
@@ -40,6 +41,7 @@ class CSample(object):
     def __init__(self):
         # self.loaded = []
         self.sample = dict()
+        self.total = 0
 
     def load_from_file(self, filename):
         sf = open(filename, 'r')
@@ -56,6 +58,7 @@ class CSample(object):
             else:
                 self.sample[filename].append((line_num, line))
         print "%-8d samples in %s" % (len(self.sample[filename]), filename)
+        self.total += len(self.sample[filename])
 
     def load_from_dir(self, dirname, filename_pattern):
         for test_file in all_files(dirname, filename_pattern):
@@ -69,12 +72,16 @@ class CSample(object):
             for smpl_ln in smpl_lns:
                 yield smpl_fn, smpl_ln[0], smpl_ln[1]
 
+    def sample_total(self):
+        return self.total
+
 
 class CRunner(object):
     def __init__(self):
         self.sample = None
         self.payload = None
         self.target = None
+        self.test_total = 0
 
     def run(self):
         pass
@@ -88,6 +95,9 @@ class CRunner(object):
     def set_target(self, target):
         self.target = target
 
+    def get_tested_count(self):
+        return self.test_total
+
 
 class SQLiURLRunner(CRunner):
     def __init__(self):
@@ -97,10 +107,17 @@ class SQLiURLRunner(CRunner):
 
     def run(self):
         import requests
+        from progress.bar import IncrementalBar
         log20x = logging.getLogger("log20x")
         log40x = logging.getLogger("log40x")
         err_log = logging.getLogger("err_logger")
+
+        case_total = self.sample.sample_total() * self.payload.sample_total()
+
+        bar = IncrementalBar('RUNNING', max=case_total)
+
         for test_url in self._generate_url():
+            bar.next()
             try:
                 # print "testing: %s" % test_url
                 r = requests.get(test_url, headers={
@@ -114,6 +131,8 @@ class SQLiURLRunner(CRunner):
 
             except requests.exceptions.ConnectionError, e:
                 err_log.error("[%s] %s" % (e, test_url))
+            self.test_total += 1
+        bar.finish()
 
     def set_sample(self, url_sample):
         self.sample = url_sample
@@ -173,7 +192,12 @@ def main():
     runner.set_sample(url_tpl)
     runner.set_payload(sqli_samples)
     runner.set_target(target)
-    runner.run()
+
+    time_start = time.time()
+    try:
+        runner.run()
+    except KeyboardInterrupt, e:
+        print '\n %d tests finished in %d seconds' % (runner.get_tested_count(), (time.time() - time_start))
 
 
 if __name__ == "__main__":
