@@ -8,7 +8,8 @@ import os
 import sys
 import getopt
 import time
-
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def setup_logging(default_path='config.yaml', default_level=logging.INFO):
     path = default_path
@@ -83,7 +84,7 @@ class CRunner(object):
         self.target = None
         self.test_total = 0
 
-    def run(self):
+    def run(self, http_method):
         pass
 
     def set_sample(self, sample):
@@ -105,8 +106,9 @@ class SQLiURLRunner(CRunner):
             if hasattr(base, '__init__'):
                 base.__init__(self)
 
-    def run(self):
-        import requests
+        self.RequestMethod = {'GET': requests.get, 'POST': requests.post }
+
+    def run(self, http_method):
         from progress.bar import IncrementalBar
         log20x = logging.getLogger("log20x")
         log40x = logging.getLogger("log40x")
@@ -116,23 +118,53 @@ class SQLiURLRunner(CRunner):
 
         bar = IncrementalBar('RUNNING', max=case_total)
 
-        for test_url in self._generate_url():
-            bar.next()
-            try:
-                # print "testing: %s" % test_url
-                r = requests.get(test_url, headers={
-                    "User-Agent": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"})
-                if r.status_code / 200 == 1:
-                    log20x.info("[%d] %s" % (r.status_code, test_url))
-                elif r.status_code >= 500:
-                    err_log.error("[%d] %s" % (r.status_code, test_url))
-                else:
-                    log40x.info("[%d] %s" % (r.status_code, test_url))
+        # executor = ThreadPoolExecutor(max_workers=100)
+        with ThreadPoolExecutor(max_workers=100) as executor:
+            # for fn, ln, test_url in self._generate_url_req():
+            #     bar.next()
+            #     try:
+            #         r = self.RequestMethod[http_method](test_url, headers={
+            #             "User-Agent": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36",
+            #             "WAF-Test-Case-ID": "%s (%d)" % (fn, ln)
+            #         })
+            #         if r.status_code / 200 == 1:
+            #             log20x.info("[%d] %s (%s:%d)" % (r.status_code, test_url, fn, ln))
+            #         elif r.status_code >= 500:
+            #             err_log.error("[%d] %s" % (r.status_code, test_url))
+            #         else:
+            #             log40x.info("[%d] %s" % (r.status_code, test_url))
+            #
+            #     except requests.exceptions.ConnectionError, e:
+            #         err_log.error("[%s] %s" % (e, test_url))
+            #     self.test_total += 1
+            # bar.finish()
+            chrome_ua = r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
+            (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"
 
-            except requests.exceptions.ConnectionError, e:
-                err_log.error("[%s] %s" % (e, test_url))
-            self.test_total += 1
-        bar.finish()
+            fe = []
+            for fn, ln, test_url in self._generate_url_req():
+                test_header = {"User-Agent": chrome_ua, "Waf-Test-Case": "%s:%d" % (os.path.basename(fn), ln)}
+                fe.append(executor.submit(self.RequestMethod[http_method], test_url, headers=test_header))
+
+            for f in as_completed(fe):
+                try:
+                    r = f.result()
+                    test_case_id = 'unknown'
+                    test_url = r.request.url
+                    if 'Waf-Test-Case' in r.headers:
+                        test_case_id = r.headers['Waf-Test-Case']
+                    bar.next()
+                    if r.status_code / 200 == 1:
+                        log20x.info("[%d] %s (%s)" % (r.status_code, test_url, test_case_id))
+                    elif r.status_code >= 500:
+                        err_log.error("[%d] %s (%s)" % (r.status_code, test_url, test_case_id))
+                    else:
+                        log40x.info("[%d] %s (%s)" % (r.status_code, test_url, test_case_id))
+                    self.test_total += 1
+                except requests.exceptions.ConnectionError, e:
+                    err_log.error("%s" % e)
+
+
 
     def set_sample(self, url_sample):
         self.sample = url_sample
@@ -143,13 +175,13 @@ class SQLiURLRunner(CRunner):
     def set_target(self, target):
         self.target = target
 
-    def _generate_url(self):
+    def _generate_url_req(self):
         if not self.payload:
             print "No payloads found."
             sys.exit(9)
         for templ in self.sample.sample_iter():
             for pld in self.payload.sample_iter():
-                yield templ[2].replace("{{.target}}", self.target).replace("{{.payload}}", pld[2])
+                yield pld[0], pld[1], templ[2].replace("{{.target}}", self.target).replace("{{.payload}}", pld[2])
 
 
 def usage():
@@ -195,9 +227,10 @@ def main():
 
     time_start = time.time()
     try:
-        runner.run()
+        runner.run('GET')
     except KeyboardInterrupt, e:
         print '\n %d tests finished in %d seconds' % (runner.get_tested_count(), (time.time() - time_start))
+    print '\n %d tests finished in %d seconds' % (runner.get_tested_count(), (time.time() - time_start))
 
 
 if __name__ == "__main__":
