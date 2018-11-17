@@ -116,7 +116,7 @@ class SQLiURLRunner(CRunner):
 
         case_total = self.sample.sample_total() * self.payload.sample_total()
 
-        bar = IncrementalBar('RUNNING', max=case_total)
+        bar = IncrementalBar(u'RUNNING', max=case_total)
 
         # executor = ThreadPoolExecutor(max_workers=100)
         with ThreadPoolExecutor(max_workers=100) as executor:
@@ -138,8 +138,7 @@ class SQLiURLRunner(CRunner):
             #         err_log.error("[%s] %s" % (e, test_url))
             #     self.test_total += 1
             # bar.finish()
-            chrome_ua = r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
-            (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"
+            chrome_ua = r"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"
 
             fe = []
             for fn, ln, test_url in self._generate_url_req():
