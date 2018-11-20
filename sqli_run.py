@@ -192,20 +192,22 @@ def usage():
 def main():
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "ht:", ["help", "target="])
+        opts, args = getopt.getopt(sys.argv[1:], "ht:", ["help", "target=", "fp="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
         sys.exit(2)
 
     target = ""
-
+    file_pattern = "sqli*"
     for opt, param in opts:
         if opt in ("-h", "--help"):
             usage()
             sys.exit(0)
         elif opt in ("-t", "--target"):
             target = param
+        elif opt in ("--fp", ):
+            file_pattern = param
         else:
             assert False, "unknown option %s" % opt
 
@@ -214,7 +216,7 @@ def main():
         sys.exit(9)
 
     sqli_samples = CSample()
-    sqli_samples.load_from_dir("./data", "sqli*")
+    sqli_samples.load_from_dir("./data", file_pattern)
 
     url_tpl = CSample()
     url_tpl.load_from_file("./data/url-sample.tpl")
